@@ -82,8 +82,15 @@ Pillow
 ## 📝 Cara Menggunakan
 
 ### 1. Install Dependencies
-```powershell
-pip install torch torchvision numpy matplotlib seaborn scikit-learn tqdm Pillow
+
+Gunakan **Conda** untuk membuat environment baru dengan Python 3.12.3 dan menginstal semua dependencies dari `requirements.txt`.
+
+#### 🧩 Buat dan Aktifkan Environment
+
+```bash
+conda create -n myenv python=3.12.3
+conda activate myenv
+pip install -r requirements.txt
 ```
 
 ### 2. Struktur Folder
