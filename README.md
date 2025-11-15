@@ -1,58 +1,85 @@
-# Autoencoder untuk Deteksi Penyakit Tanaman Kentang
+# CNN untuk Klasifikasi Penyakit Tanaman Kentang
 
-Proyek ini menggunakan **Autoencoder berbasis PyTorch** untuk mendeteksi anomali (penyakit) pada daun kentang dengan pendekatan unsupervised learning. Model dilatih hanya pada gambar daun sehat, dan mendeteksi penyakit berdasarkan reconstruction error.
+Proyek ini menggunakan **Convolutional Neural Network (CNN) murni berbasis PyTorch** untuk mengklasifikasikan penyakit pada daun kentang ke dalam 3 kategori: **Healthy**, **Early Blight**, dan **Late Blight**.
 
 ## 📋 Deskripsi Proyek
 
-Model Autoencoder belajar merekonstruksi gambar daun kentang yang sehat. Ketika diberikan gambar daun berpenyakit, model akan menghasilkan reconstruction error yang tinggi karena pola penyakit tidak pernah dipelajari selama training.
+Model CNN dilatih untuk mengenali pola visual dari daun kentang yang sehat dan berpenyakit menggunakan pendekatan supervised learning. Arsitektur CNN murni (tanpa pretrained model) dirancang khusus untuk task klasifikasi multi-kelas ini.
 
 ### Dataset
-- **Training**: Hanya gambar `Potato___healthy`
-- **Testing**: Semua kelas (Healthy, Early_blight, Late_blight)
-- **Augmentasi**: Random horizontal flip, rotation ±15°, resize 128×128
+- **Training & Validation**: Semua kelas (80% training, 20% validation)
+- **Testing**: Semua kelas untuk evaluasi akhir
+- **Kelas**: 
+  - Potato___Early_blight
+  - Potato___healthy
+  - Potato___Late_blight
+- **Augmentasi**: Random horizontal flip, rotation ±15°, color jitter, normalisasi ImageNet
 
 ## 🏗️ Arsitektur Model
 
-### Encoder
+### CNN Architecture
 ```
 Input (3×128×128) 
-  → Conv2D(3→16, stride=2) + ReLU → (16×64×64)
-  → Conv2D(16→32, stride=2) + ReLU → (32×32×32)
-  → Conv2D(32→64, stride=2) + ReLU → (64×16×16)
-  → Conv2D(64→128, stride=2) + ReLU → (128×8×8)
+
+Block 1: 3 → 32
+  → Conv2D(3→32, 3×3, padding=1) + BatchNorm + ReLU
+  → Conv2D(32→32, 3×3, padding=1) + BatchNorm + ReLU
+  → MaxPool2D(2×2) + Dropout(0.1) → (32×64×64)
+
+Block 2: 32 → 64
+  → Conv2D(32→64, 3×3, padding=1) + BatchNorm + ReLU
+  → Conv2D(64→64, 3×3, padding=1) + BatchNorm + ReLU
+  → MaxPool2D(2×2) + Dropout(0.2) → (64×32×32)
+
+Block 3: 64 → 128
+  → Conv2D(64→128, 3×3, padding=1) + BatchNorm + ReLU
+  → Conv2D(128→128, 3×3, padding=1) + BatchNorm + ReLU
+  → MaxPool2D(2×2) + Dropout(0.3) → (128×16×16)
+
+Block 4: 128 → 256
+  → Conv2D(128→256, 3×3, padding=1) + BatchNorm + ReLU
+  → Conv2D(256→256, 3×3, padding=1) + BatchNorm + ReLU
+  → MaxPool2D(2×2) + Dropout(0.4) → (256×8×8)
+
+Global Average Pooling → (256)
+
+Classifier:
+  → Linear(256→128) + ReLU + Dropout(0.5)
+  → Linear(128→3)
 ```
 
-### Decoder
-```
-Latent (128×8×8)
-  → ConvTranspose2D(128→64) + ReLU → (64×16×16)
-  → ConvTranspose2D(64→32) + ReLU → (32×32×32)
-  → ConvTranspose2D(32→16) + ReLU → (16×64×64)
-  → ConvTranspose2D(16→3) + Sigmoid → (3×128×128)
-```
+**Total Parameters**: ~600K parameters
 
 ## 🚀 Fitur Utama
 
-1. **Data Loading Modular**
+1. **CNN Murni (Tanpa Pretrained)**
+   - Arsitektur custom-built dari scratch
+   - 4 convolutional blocks dengan BatchNorm
+   - Global Average Pooling untuk feature aggregation
+   - Dropout untuk regularisasi
+
+2. **Data Loading & Augmentasi**
    - Augmentasi on-the-fly untuk training
    - Split train/validation (80/20)
+   - Normalisasi menggunakan ImageNet statistics
    - Support untuk multiple classes
 
-2. **Training Components**
-   - Loss: MSELoss
-   - Optimizer: Adam (lr=1e-3)
-   - Scheduler: ReduceLROnPlateau (patience=3, factor=0.5)
-   - Early Stopping (patience=7)
-   - Model Checkpoint (simpan model terbaik)
+3. **Training Components**
+   - Loss: CrossEntropyLoss (untuk klasifikasi multi-kelas)
+   - Optimizer: Adam (lr=1e-3, weight_decay=1e-4)
+   - Scheduler: ReduceLROnPlateau (patience=5, factor=0.5)
+   - Early Stopping (patience=10)
+   - Model Checkpoint (simpan model terbaik berdasarkan val_loss)
 
-3. **Evaluasi & Visualisasi**
-   - Reconstruction error per kelas
-   - Histogram dan boxplot distribusi error
-   - Perbandingan visual: original vs reconstructed vs error map
-   - Learning curve dan learning rate schedule
-   - Anomaly detection dengan threshold sederhana
+4. **Evaluasi & Visualisasi Lengkap**
+   - Confusion Matrix (counts & normalized)
+   - Classification Report (precision, recall, F1-score)
+   - Learning curves (loss & accuracy)
+   - Visualisasi prediksi benar vs salah
+   - Visualisasi prediksi per kelas
+   - Per-class performance metrics
 
-4. **Reproducibility**
+5. **Reproducibility**
    - Random seed = 42 untuk semua komponen
    - Deterministic CUDA operations
 
@@ -60,23 +87,23 @@ Latent (128×8×8)
 
 Setelah training selesai, file berikut akan dibuat di folder `model/`:
 
-- `best_autoencoder.pth` - Model terbaik (val_loss minimum)
-- `training_history.png` - Learning curve dan LR schedule
-- `error_distribution.png` - Histogram dan boxplot error
-- `reconstruction_examples.png` - Contoh rekonstruksi per kelas
-- `low_vs_high_error.png` - Perbandingan daun sehat vs berpenyakit
+- `best_cnn_model.pth` - Model terbaik (val_loss minimum)
+- `training_history.png` - Learning curve (loss & accuracy) dan LR schedule
+- `confusion_matrix.png` - Confusion matrix (counts & normalized)
+- `prediction_samples.png` - Contoh prediksi benar vs salah
+- `predictions_per_class.png` - Contoh prediksi untuk setiap kelas
 
 ## 🔧 Requirements
 
 ```bash
-torch
-torchvision
-numpy
-matplotlib
-seaborn
-scikit-learn
-tqdm
-Pillow
+torch>=2.0.0
+torchvision>=0.15.0
+numpy>=1.24.0
+matplotlib>=3.7.0
+seaborn>=0.12.0
+scikit-learn>=1.3.0
+tqdm>=4.65.0
+Pillow>=10.0.0
 ```
 
 ## 📝 Cara Menggunakan
@@ -96,7 +123,7 @@ pip install -r requirements.txt
 ### 2. Struktur Folder
 Pastikan struktur folder seperti ini:
 ```
-Autoencoder/
+Simple-Autoendcoder/
 ├── dataset/
 │   ├── Potato___Early_blight/
 │   ├── Potato___healthy/
@@ -104,23 +131,24 @@ Autoencoder/
 ├── model/                    # Akan dibuat otomatis
 ├── notebook/
 │   └── notebook.ipynb
-└── README.md
+├── README.md
+└── requirements.txt
 ```
 
 ### 3. Jalankan Notebook
 1. Buka `notebook/notebook.ipynb` di Jupyter atau VS Code
 2. Jalankan semua cell secara berurutan
-3. Model akan dilatih selama maksimal 50 epoch (atau sampai early stopping)
+3. Model akan dilatih selama maksimal 100 epoch (atau sampai early stopping)
 4. Output akan tersimpan di folder `model/`
 
-### 4. Prediksi Gambar Baru (Optional)
+### 4. Prediksi Gambar Baru
 Gunakan fungsi `predict_single_image()` di cell terakhir:
 
 ```python
 result = predict_single_image(
     r"path/to/your/image.jpg",
     model, 
-    threshold, 
+    class_names,
     device
 )
 print(result)
@@ -129,51 +157,70 @@ print(result)
 ## 📈 Expected Results
 
 Model yang baik akan menunjukkan:
-- **Daun sehat**: Reconstruction error rendah (< threshold)
-- **Daun berpenyakit**: Reconstruction error tinggi (> threshold)
-- **Threshold**: Biasanya dihitung sebagai `mean + 2×std` dari error daun sehat
+- **Accuracy**: > 90% pada test set
+- **Confusion Matrix**: Diagonal values tinggi (prediksi benar)
+- **Learning Curve**: Konvergen tanpa overfitting (train & val loss menurun bersamaan)
+- **Per-class Performance**: Precision, recall, dan F1-score tinggi untuk semua kelas
 
 ### Metrik Evaluasi
-- Accuracy: Seberapa akurat klasifikasi normal vs anomaly
-- Precision: Dari yang diprediksi penyakit, berapa yang benar
-- Recall: Dari semua penyakit, berapa yang terdeteksi
-- F1-Score: Harmonic mean dari precision dan recall
+- **Accuracy**: Persentase prediksi yang benar secara keseluruhan
+- **Precision**: Dari yang diprediksi sebagai kelas tertentu, berapa yang benar
+- **Recall**: Dari semua instance kelas tertentu, berapa yang terdeteksi
+- **F1-Score**: Harmonic mean dari precision dan recall
 
 ## 🎯 Interpretasi Hasil
 
 ### Learning Curve
-- **Train loss menurun**: Model belajar merekonstruksi gambar sehat
-- **Val loss stabil**: Model tidak overfit
-- **Gap kecil**: Generalisasi baik
+- **Loss menurun**: Model belajar dengan baik
+- **Train & Val loss gap kecil**: Tidak overfitting
+- **Accuracy meningkat**: Model semakin baik mengklasifikasi
 
-### Error Distribution
-- **Healthy**: Error rendah, distribusi sempit
-- **Diseased**: Error tinggi, distribusi lebih lebar
-- **Threshold**: Pemisah yang baik antara kedua kelompok
+### Confusion Matrix
+- **Diagonal tinggi**: Prediksi benar untuk masing-masing kelas
+- **Off-diagonal rendah**: Kesalahan klasifikasi minimal
+- **Normalized view**: Menunjukkan persentase akurasi per kelas
 
-### Visualisasi Rekonstruksi
-- **Healthy**: Original ≈ Reconstructed (error map gelap)
-- **Diseased**: Original ≠ Reconstructed (error map terang pada area penyakit)
+### Visualisasi Prediksi
+- **Correct predictions**: Model confident dengan probabilitas tinggi
+- **Wrong predictions**: Biasanya terjadi pada kasus ambiguous atau borderline
+- **Per-class samples**: Menunjukkan konsistensi model dalam setiap kelas
 
 ## 🔬 Hyperparameter Tuning
 
 Jika hasil kurang memuaskan, coba:
 
-1. **Learning Rate**: 1e-4 atau 5e-4 (lebih stabil tapi lambat)
-2. **Batch Size**: 16 (lebih stabil) atau 64 (lebih cepat)
-3. **Architecture**: Tambah layer atau channels
-4. **Augmentation**: Tambah color jitter, brightness
-5. **Threshold**: Gunakan percentile atau ROC curve
+1. **Learning Rate**: 
+   - Lebih rendah (5e-4, 1e-4) untuk training lebih stabil
+   - Lebih tinggi (5e-3) untuk konvergensi lebih cepat
+
+2. **Batch Size**: 
+   - Lebih kecil (16, 8) untuk generalisasi lebih baik
+   - Lebih besar (64, 128) untuk training lebih cepat
+
+3. **Architecture**: 
+   - Tambah conv layers atau channels untuk capacity lebih besar
+   - Kurangi dropout jika underfitting
+   - Tambah dropout jika overfitting
+
+4. **Augmentation**: 
+   - Tambah: RandomResizedCrop, RandomAffine, GaussianBlur
+   - Sesuaikan intensity (brightness, contrast, saturation)
+
+5. **Training Strategy**:
+   - Increase epochs jika belum converge
+   - Adjust scheduler patience dan factor
+   - Try different optimizers (SGD with momentum, AdamW)
 
 ## 📚 Referensi
 
 - [PyTorch Documentation](https://pytorch.org/docs/stable/index.html)
-- [Autoencoder Tutorial](https://pytorch.org/tutorials/beginner/introyt/autoencoderyt.html)
-- [Anomaly Detection with Autoencoders](https://arxiv.org/abs/1901.03407)
+- [CNN for Image Classification](https://pytorch.org/tutorials/beginner/blitz/cifar10_tutorial.html)
+- [Deep Learning for Computer Vision](https://cs231n.github.io/)
+- [Plant Disease Classification Research](https://arxiv.org/abs/1604.03169)
 
 ## 👤 Author
 
-Proyek ini dibuat sebagai implementasi Autoencoder untuk deteksi anomali pada tanaman kentang.
+Proyek ini dibuat sebagai implementasi CNN murni untuk klasifikasi penyakit tanaman kentang.
 
 ## 📄 License
 
